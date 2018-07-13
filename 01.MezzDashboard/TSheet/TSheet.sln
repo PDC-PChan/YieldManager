@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFPortal_CSharp", "..\..\..
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallDateAPI", "..\..\02.CDA\CallDateAPI\CallDateAPI\CallDateAPI.csproj", "{9E388F7E-CA04-4CEB-96C2-A5053B507843}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YieldSurface", "..\..\04.YieldSurface\YieldSurface\YieldSurface\YieldSurface.csproj", "{9971ECE4-EC9C-413A-B478-553CECBC24DA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{9E388F7E-CA04-4CEB-96C2-A5053B507843}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9E388F7E-CA04-4CEB-96C2-A5053B507843}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9E388F7E-CA04-4CEB-96C2-A5053B507843}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

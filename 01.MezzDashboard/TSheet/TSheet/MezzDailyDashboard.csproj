@@ -77,6 +77,10 @@
       <Project>{9e388f7e-ca04-4ceb-96c2-a5053b507843}</Project>
       <Name>CallDateAPI</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\04.YieldSurface\YieldSurface\YieldSurface\YieldSurface.csproj">
+      <Project>{9971ece4-ec9c-413a-b478-553cecbc24da}</Project>
+      <Name>YieldSurface</Name>
+    </ProjectReference>
     <ProjectReference Include="Z:\32. Structuring\96. Pak Data\CSharpe_MySQL\CSharpe_MySQL\CSharpe_MySQL.csproj">
       <Project>{e4511638-b9ff-4d71-8e4a-e5b264a20ad3}</Project>
       <Name>CSharpe_MySQL</Name>

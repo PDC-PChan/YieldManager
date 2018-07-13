@@ -11,6 +11,7 @@ using StructuredFinancePortal;
 using System.Collections.Concurrent;
 using CallDateAPI;
 using VB = Microsoft.VisualBasic;
+using YieldSurface;
 
 namespace MezzDailyDashboard
 {
@@ -22,8 +23,10 @@ namespace MezzDailyDashboard
         private string FundName;
         private SFPortal sfp;
         private ConcurrentQueue<BondStructure> CallDateQueue;
+        private ConcurrentQueue<DataRow> DMQueue;
         private bool LastBondToCalculateLife = false;
         private Dictionary<string, double> exLifeDictionary;
+        private Dictionary<string, double> DM_Dictionary;
 
         public QueryManager()
         {
@@ -32,6 +35,8 @@ namespace MezzDailyDashboard
             sfp.Login("pChan", "PD0317");
             CallDateQueue = new ConcurrentQueue<BondStructure>();
             exLifeDictionary = new Dictionary<string, double>();
+            DMQueue = new ConcurrentQueue<DataRow>();
+            DM_Dictionary = new Dictionary<string, double>();
         }
 
         public void DoWork(Tearsheet ts, DateTime _AsOfDate)
@@ -86,6 +91,7 @@ namespace MezzDailyDashboard
 
             MasterTable = new DataTable();
             ModelManager mm = new ModelManager();
+            YieldSurModMgr ym = new YieldSurModMgr(AsOfDate.ToString("yyyyMMdd"));
 
             Task NonRTasks = Task.Run(() =>
             {
@@ -126,17 +132,37 @@ namespace MezzDailyDashboard
                         exLifeDictionary.Add(bs.TrancheID, expMaturiy);
                     }
                 }
+
+                while (DMQueue.Count>0)
+                {
+                    DataRow iRow;
+                    double requiredDM = double.NaN;
+
+                    if (DMQueue.TryDequeue(out iRow))
+                    {
+                        requiredDM  = ym.GetDM(iRow["MODIFIED_RATING"].ToString(), To_DM_Model_Dataframe(iRow));
+                        DM_Dictionary.Add(iRow["Deal Name"].ToString(), requiredDM);
+                    }
+                    
+                }
             });
 
+            
             Task.WaitAll(NonRTasks, RTasks);
 
             //###### Post R operation #######
             string CallDate_ColumnName = "exLife";
             DataColumn CallDate_Column = new DataColumn(CallDate_ColumnName, typeof(double));
             MasterTable.Columns.Add(CallDate_Column);
+
+            string Yield_ColumnName = "ReqYield";
+            DataColumn Yield_Column = new DataColumn(Yield_ColumnName, typeof(double));
+            MasterTable.Columns.Add(Yield_Column);
+
             foreach (DataRow idr in MasterTable.Rows)
             {
                 idr[CallDate_ColumnName] = exLifeDictionary[idr["Deal Name"].ToString()];
+                idr[Yield_ColumnName] = DM_Dictionary[idr["Deal Name"].ToString()];
             }
         }
 
@@ -194,7 +220,7 @@ namespace MezzDailyDashboard
             MasterResultTable.Columns.Add("DealType", typeof(int));
             while (trancheType == 2)
             {
-                trancheType = Math.Min((short)2,Convert.ToInt16(VB.Interaction.InputBox("Please input tranche type:", "Invalid Tranche Type", "0")));
+                trancheType = Math.Min((short)2,Convert.ToInt16(VB.Interaction.InputBox("Please input tranche type:", "Invalid Tranche Type for " + DealName, "0")));
             }
             MasterResultTable.Rows[0]["DealType"] = trancheType;
 
@@ -225,6 +251,8 @@ namespace MezzDailyDashboard
                 NAV = Convert.ToDouble(MasterResultTable.Rows[0]["NAV"].ToString())
             };
             CallDateQueue.Enqueue(bs);
+
+            DMQueue.Enqueue(MasterResultTable.Rows[0]);
 
             return MasterResultTable.Rows[0];
         }
@@ -264,6 +292,27 @@ namespace MezzDailyDashboard
                 return 2;
             }
 
+        }
+
+        private string To_DM_Model_Dataframe(DataRow irow)
+        {
+            string returnString = string.Format("data.frame(" +
+                "T2R = {0}," +
+                "CpnRate = {1}," +
+                "JPM_DM = {2}," +
+                "WAS = {3}," +
+                "WAL = {4}," +
+                "NAV = {5}," +
+                "MVOC = {6})",
+                Convert.ToDouble(irow["T2R"]),
+                Convert.ToDouble(irow["Coupon"]),
+                Convert.ToDouble(irow["JPM_TRANCHE1"]),
+                Convert.ToDouble(irow["WAS"]),
+                Convert.ToDouble(irow["WAL"]),
+                Convert.ToDouble(irow["NAV"]),
+                Convert.ToDouble(irow["MVOC"])
+                );
+            return returnString;
         }
 
         private void CleanUp()

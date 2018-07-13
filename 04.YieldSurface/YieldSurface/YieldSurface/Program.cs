@@ -10,6 +10,8 @@ namespace YieldSurface
     {
         static void Main(string[] args)
         {
+            YieldSurModMgr ym = new YieldSurModMgr();
+            ym.TrainModels();
         }
     }
 }
