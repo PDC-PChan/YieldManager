@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallDateAPI", "..\..\02.CDA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YieldSurface", "..\..\04.YieldSurface\YieldSurface\YieldSurface\YieldSurface.csproj", "{9971ECE4-EC9C-413A-B478-553CECBC24DA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MezzCashflows", "..\..\03.MezzCashflows\MezzCashflows\MezzCashflows\MezzCashflows.csproj", "{47D24144-A56A-4143-988E-22ECF3FE02D3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9971ECE4-EC9C-413A-B478-553CECBC24DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{47D24144-A56A-4143-988E-22ECF3FE02D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{47D24144-A56A-4143-988E-22ECF3FE02D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{47D24144-A56A-4143-988E-22ECF3FE02D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{47D24144-A56A-4143-988E-22ECF3FE02D3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

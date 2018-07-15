@@ -26,6 +26,18 @@ namespace MezzCashflows
            
             return sum;
         }
+
+        public static double XNPV(double dRate, double[] receipts, DateTime[] dates,  DateTime issueDate)
+        {
+            double sum =0;
+
+            for (int i = 0; i < dates.Length; i++)
+            {
+                TimeSpan ts = dates[i].Subtract(issueDate);
+                sum += receipts[i] / Math.Pow((1 + dRate) , ts.TotalDays / 360);
+            }
+            return sum;
+        }
     }
 
     public static class XIRR

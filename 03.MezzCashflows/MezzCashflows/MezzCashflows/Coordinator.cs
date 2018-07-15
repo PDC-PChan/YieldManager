@@ -13,7 +13,7 @@ namespace MezzCashflows
     {
         public static void DatabaseGeneralUpdate()
         {
-            int numSplit = 6;
+            int numSplit = 2;
             ConcurrentDictionary<string, Dictionary<DateTime, Dictionary<string, HashSet<double>>>> Deal_Date_Tranche_Price = new ConcurrentDictionary<string, Dictionary<DateTime, Dictionary<string, HashSet<double>>>>();
             string Query = string.Format("SELECT `TRANCHEID`,DATE(`RECEIVEDTIME`),`SUGGESTEDPRICE` FROM CONSOLIDATEDPRICE " +
                 "WHERE  `YIELD(T2R)` IS NULL AND `SUGGESTEDPRICE` IS NOT NULL AND `REGION` = 'US' " +
@@ -69,6 +69,30 @@ namespace MezzCashflows
                 }));
             }
             Task.WaitAll(Tasks.ToArray());
+        }
+
+        public static Tuple<double,double> BreakPIKCDR(string TrancheID,DateTime AsOfDate)
+        {
+            CashflowManager cm = new CashflowManager();
+            return (cm.GetSpecialCDRs(TrancheID, AsOfDate));
+        }
+
+        public static Tuple<double,double> Prices(string trancheID,DateTime AsOfDate,double ReqDM)
+        {
+            CashflowManager cm = new CashflowManager();
+            return cm.GetPrices(trancheID, AsOfDate, ReqDM);
+        }
+
+        public static Tuple<double,double,double,double> Do_CDR_Prices(string trancheID, DateTime AsOfDate, double ReqDM)
+        {
+            CashflowManager cm = new CashflowManager();
+            cm.LoadDeal(trancheID, AsOfDate);
+
+            Tuple<double, double> CDR_Tuples = cm.GetSpecialCDRs(trancheID, AsOfDate,false);
+            Tuple<double, double> Price_Tuples = cm.GetPrices(trancheID, AsOfDate,ReqDM,false);
+
+            return new Tuple<double, double, double, double>(CDR_Tuples.Item1, CDR_Tuples.Item2, Price_Tuples.Item1, Price_Tuples.Item2);
+
         }
     }
 }

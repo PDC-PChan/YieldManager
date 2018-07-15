@@ -18,7 +18,7 @@ namespace MezzDailyDashboard
         public Tearsheet()
         {
             InitializeComponent();
-            initializeFundList();
+            //initializeFundList();
             initilizeGears();
             ShowDialog();
         }
@@ -47,8 +47,6 @@ namespace MezzDailyDashboard
             {
                 FundList.Add(iRow[0]);
             }
-
-            comboBox1.Items.AddRange(FundList.ToArray());
         }
 
         private void label1_Click(object sender, EventArgs e)
@@ -59,9 +57,8 @@ namespace MezzDailyDashboard
         private void button1_Click(object sender, EventArgs e)
         {
             Cursor.Current = Cursors.WaitCursor;
-            string FundName = this.comboBox1.Text;
             DateTime AsOfDate = this.dateTimePicker1.Value;
-            qm.DoWork(this, AsOfDate);
+            qm.DoSomeWork(this, AsOfDate);
             Cursor.Current = Cursors.Default;
         }
 

@@ -12,8 +12,10 @@ namespace YieldSurface
         public static string Directory_Model = MasterDirectory + @"\R_Model";
         public static string Directory_TrainData = MasterDirectory + @"\SurfaceTrainingData";
         public static string Directory_RScripts = MasterDirectory + @"\R_Scripts";
+        public static string Directory_SurfaceOutput = MasterDirectory + @"\YieldSurfaceOutput";
 
         public static string Script_GenerateModel = Directory_RScripts + @"\GenerateModel.R";
         public static string Script_LoadPackages = Directory_RScripts + @"\LoadPackages.R";
+        public static string Script_PopulateSurfaces = Directory_RScripts + @"\PrintSurfaces.R";
     }
 }

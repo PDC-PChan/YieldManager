@@ -5,7 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{1029E7D8-A5E5-4E41-AC01-B31C660FC085}</ProjectGuid>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Exe</OutputType>
     <RootNamespace>MezzDailyDashboard</RootNamespace>
     <AssemblyName>MezzDailyDashboard</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
@@ -76,6 +76,10 @@
     <ProjectReference Include="..\..\..\02.CDA\CallDateAPI\CallDateAPI\CallDateAPI.csproj">
       <Project>{9e388f7e-ca04-4ceb-96c2-a5053b507843}</Project>
       <Name>CallDateAPI</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\03.MezzCashflows\MezzCashflows\MezzCashflows\MezzCashflows.csproj">
+      <Project>{47d24144-a56a-4143-988e-22ecf3fe02d3}</Project>
+      <Name>MezzCashflows</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\..\04.YieldSurface\YieldSurface\YieldSurface\YieldSurface.csproj">
       <Project>{9971ece4-ec9c-413a-b478-553cecbc24da}</Project>

@@ -12,6 +12,7 @@ using System.Collections.Concurrent;
 using CallDateAPI;
 using VB = Microsoft.VisualBasic;
 using YieldSurface;
+using MezzCashflows;
 
 namespace MezzDailyDashboard
 {
@@ -20,26 +21,43 @@ namespace MezzDailyDashboard
         private OrderedDictionary QueryClusters;
         private DateTime AsOfDate;
         private DataTable MasterTable;
-        private string FundName;
+        private string OutputCSVPath;
         private SFPortal sfp;
         private ConcurrentQueue<BondStructure> CallDateQueue;
         private ConcurrentQueue<DataRow> DMQueue;
+        private ConcurrentQueue<Tuple<string, DateTime, double>> PricesQueue;
         private bool LastBondToCalculateLife = false;
+        private bool FinishRCalculations = false;
         private Dictionary<string, double> exLifeDictionary;
         private Dictionary<string, double> DM_Dictionary;
+        private Dictionary<string, double> PIKCDR_Dictionary;
+        private Dictionary<string, double> BrkEvenCDR_Dictionary;
+        private Dictionary<string, double> CleanPriceDictionary;
+        private Dictionary<string, double> DirtyPriceDictionary;
 
-        public QueryManager()
+        public QueryManager(string _OutputCSVPath = "")
         {
             QueryClusters = new OrderedDictionary();
             sfp = new SFPortal();
             sfp.Login("pChan", "PD0317");
+
+            PIKCDR_Dictionary = new Dictionary<string, double>();
+            BrkEvenCDR_Dictionary = new Dictionary<string, double>();
+
             CallDateQueue = new ConcurrentQueue<BondStructure>();
             exLifeDictionary = new Dictionary<string, double>();
+
             DMQueue = new ConcurrentQueue<DataRow>();
             DM_Dictionary = new Dictionary<string, double>();
+
+            PricesQueue = new ConcurrentQueue<Tuple<string, DateTime, double>>();
+            CleanPriceDictionary = new Dictionary<string, double>();
+            DirtyPriceDictionary = new Dictionary<string, double>();
+
+            OutputCSVPath = _OutputCSVPath;
         }
 
-        public void DoWork(Tearsheet ts, DateTime _AsOfDate)
+        public void DoSomeWork(Tearsheet ts, DateTime _AsOfDate)
         {
             // Variable declaration
             List<string> DealList = new List<string>();
@@ -55,10 +73,44 @@ namespace MezzDailyDashboard
                 DealList.Add(string.Format("{0}.{1}", iRow[0],iRow[1]));
             }
 
-            ProcessQueries_MultipleDeals(DealList.ToArray());
+            ProcessQueries_MultipleDeals(DealList.ToArray(),1);
 
             CleanUp();
             ts.SetDataSource(MasterTable);
+        }
+
+
+        public void CurrentPortfolioBehindScene(DateTime _AsOfDate)
+        {
+            // Variable declaration
+            List<string> DealList = new List<string>();
+            List<List<string>> queryResult;
+            AsOfDate = _AsOfDate;
+
+            // Initialization
+            ReadInQueries();
+            queryResult = ConnectDB.ReadDB(2, string.Format("SELECT `CDONETNAME`,`LABEL`,SUM(`NOTIONAL`) AS `FACE` FROM GHIF_HOLDINGS " +
+                "WHERE `PURCHASEDATE` <= '{0}' GROUP BY `CDONETNAME` HAVING SUM(`NOTIONAL`) > 0", AsOfDate.ToString("yyyy-MM-dd")));
+            foreach (List<string> iRow in queryResult)
+            {
+                DealList.Add(string.Format("{0}.{1}", iRow[0], iRow[1]));
+            }
+
+            ProcessQueries_MultipleDeals(DealList.ToArray(), 1);
+
+            CleanUp();
+
+            DTWrite2CSV(MasterTable, OutputCSVPath,false);
+        }
+
+
+        public void AddBonds(DateTime _AsOfDate, string[] TrancheIDs)
+        {
+            AsOfDate = _AsOfDate;
+            ReadInQueries();
+            ProcessQueries_MultipleDeals(TrancheIDs, 0);
+            CleanUp();
+            DTWrite2CSV(MasterTable, OutputCSVPath,true);
         }
 
         private void ReadInQueries()
@@ -85,7 +137,7 @@ namespace MezzDailyDashboard
             }
         }
 
-        private void ProcessQueries_MultipleDeals(string[] TrancheIDScope)
+        private void ProcessQueries_MultipleDeals(string[] TrancheIDScope,int status)
         {
             string TrancheID = "";
 
@@ -93,12 +145,12 @@ namespace MezzDailyDashboard
             ModelManager mm = new ModelManager();
             YieldSurModMgr ym = new YieldSurModMgr(AsOfDate.ToString("yyyyMMdd"));
 
-            Task NonRTasks = Task.Run(() =>
+            Task PreRTasks = Task.Run(() =>
             {
                 if (TrancheIDScope.Length > 0)
                 {
                     TrancheID = TrancheIDScope[0];
-                    DataRow idr = ProcessQueries_SingleDeal(TrancheID.Split('.')[0], TrancheID.Split('.')[1]);
+                    DataRow idr = ProcessQueries_SingleDeal(TrancheID.Split('.')[0], TrancheID.Split('.')[1], status);
                     foreach (DataColumn idc in idr.Table.Columns)
                     {
                         MasterTable.Columns.Add(idc.ColumnName, idc.DataType);
@@ -110,7 +162,7 @@ namespace MezzDailyDashboard
                         Parallel.For(1, TrancheIDScope.Length, (i) =>
                         {
                             TrancheID = TrancheIDScope[i];
-                            DataRow jdr = ProcessQueries_SingleDeal(TrancheID.Split('.')[0], TrancheID.Split('.')[1]);
+                            DataRow jdr = ProcessQueries_SingleDeal(TrancheID.Split('.')[0], TrancheID.Split('.')[1], status);
                             MasterTable.Rows.Add(jdr.ItemArray);
                         });
                     }
@@ -127,8 +179,16 @@ namespace MezzDailyDashboard
 
                     if (CallDateQueue.TryDequeue(out bs))
                     {
-                        mm.PriceBond(bs, false);
-                        expMaturiy = Math.Max(0.1,((bs.EarliestCall.AddDays(mm.GetExpectedLife()) - bs.AsOfDate).Days / 365.25));
+                        try
+                        {
+                            mm.PriceBond(bs, false);
+                            expMaturiy = Math.Max(0.1, ((bs.EarliestCall.AddDays(mm.GetExpectedLife()) - bs.AsOfDate).Days / 365.25));
+                            
+                        }
+                        catch (Exception)
+                        {
+                            expMaturiy = double.NaN;
+                        }
                         exLifeDictionary.Add(bs.TrancheID, expMaturiy);
                     }
                 }
@@ -140,33 +200,121 @@ namespace MezzDailyDashboard
 
                     if (DMQueue.TryDequeue(out iRow))
                     {
-                        requiredDM  = ym.GetDM(iRow["MODIFIED_RATING"].ToString(), To_DM_Model_Dataframe(iRow));
+                        try
+                        {
+                            requiredDM = ym.GetDM(iRow["MODIFIED_RATING"].ToString(), To_DM_Model_Dataframe(iRow));
+                        }
+                        catch (Exception)
+                        {
+                            requiredDM = double.NaN;
+                        }
+                        
                         DM_Dictionary.Add(iRow["Deal Name"].ToString(), requiredDM);
+                        PricesQueue.Enqueue(new Tuple<string, DateTime, double>(iRow["Deal Name"].ToString(), AsOfDate, requiredDM));
                     }
                     
                 }
+                FinishRCalculations = true;
+
+            });
+
+            Task PostRTask = Task.Run(() => 
+            {
+                List<Task> Tasks = new List<Task>();
+
+                while (!FinishRCalculations || PricesQueue.Count > 0)
+                {
+                    Tuple<string, DateTime, double> PriceCombo;
+                    Tuple<double,double,double,double> CDR_Prices;
+                    Tuple<double, double> JustCDRs;
+
+                    if (PricesQueue.TryDequeue(out PriceCombo))
+                    {
+                        Tasks.Add(Task.Factory.StartNew(() =>
+                        {
+                            if (!double.IsNaN(PriceCombo.Item3))
+                            {
+                                CDR_Prices = Coordinator.Do_CDR_Prices(PriceCombo.Item1, PriceCombo.Item2, PriceCombo.Item3);
+                            }
+                            else
+                            {
+                                JustCDRs = Coordinator.BreakPIKCDR(PriceCombo.Item1, PriceCombo.Item2);
+                                CDR_Prices = new Tuple<double, double, double, double>(JustCDRs.Item1, JustCDRs.Item2, double.NaN, double.NaN);
+                            }
+
+                            PIKCDR_Dictionary.Add(PriceCombo.Item1, CDR_Prices.Item1);
+                            BrkEvenCDR_Dictionary.Add(PriceCombo.Item1, CDR_Prices.Item2);
+                            CleanPriceDictionary.Add(PriceCombo.Item1, CDR_Prices.Item3);
+                            DirtyPriceDictionary.Add(PriceCombo.Item1, CDR_Prices.Item4);
+                        }));
+
+                    }
+                }
+
+                Task.WaitAll(Tasks.ToArray());
             });
 
             
-            Task.WaitAll(NonRTasks, RTasks);
+            Task.WaitAll(PreRTasks, RTasks,  PostRTask);
 
             //###### Post R operation #######
             string CallDate_ColumnName = "exLife";
             DataColumn CallDate_Column = new DataColumn(CallDate_ColumnName, typeof(double));
             MasterTable.Columns.Add(CallDate_Column);
 
-            string Yield_ColumnName = "ReqYield";
+            string Yield_ColumnName = "ReqDM";
             DataColumn Yield_Column = new DataColumn(Yield_ColumnName, typeof(double));
             MasterTable.Columns.Add(Yield_Column);
 
+            string CleanPrice_ColumnName = "CleanPx";
+            DataColumn CleanPx_Column = new DataColumn(CleanPrice_ColumnName, typeof(double));
+            MasterTable.Columns.Add(CleanPx_Column);
+
+            string DirtyPrice_ColumnName = "DirtyPx";
+            DataColumn DirtyPx_Column = new DataColumn(DirtyPrice_ColumnName, typeof(double));
+            MasterTable.Columns.Add(DirtyPx_Column);
+
             foreach (DataRow idr in MasterTable.Rows)
             {
-                idr[CallDate_ColumnName] = exLifeDictionary[idr["Deal Name"].ToString()];
-                idr[Yield_ColumnName] = DM_Dictionary[idr["Deal Name"].ToString()];
+                try
+                {
+                    idr[CallDate_ColumnName] = exLifeDictionary[idr["Deal Name"].ToString()];
+                }
+                catch (Exception)
+                {
+                    idr[CallDate_ColumnName] = double.NaN;
+                }
+
+                try
+                {
+                    idr[Yield_ColumnName] = DM_Dictionary[idr["Deal Name"].ToString()];
+                }
+                catch (Exception)
+                {
+                    idr[Yield_ColumnName] = double.NaN;
+                }
+
+                try
+                {
+                    idr[CleanPrice_ColumnName] = CleanPriceDictionary[idr["Deal Name"].ToString()];
+                }
+                catch (Exception)
+                {
+                    idr[CleanPrice_ColumnName] = double.NaN;
+                }
+
+                try
+                {
+                    idr[DirtyPrice_ColumnName] = DirtyPriceDictionary[idr["Deal Name"].ToString()];
+                }
+                catch (Exception)
+                {
+                    idr[DirtyPrice_ColumnName] = double.NaN;
+                }
             }
         }
 
-        private DataRow ProcessQueries_SingleDeal(string DealName, string TrancheLabel)
+        private DataRow ProcessQueries_SingleDeal(string DealName, string TrancheLabel, int status)
         {
             string baseQuery = string.Format("SET @DEAL_NAME = '{0}'; " +
                 "SET @TRANCHE_ID = '{2}'; " +
@@ -176,6 +324,7 @@ namespace MezzDailyDashboard
                 AsOfDate.ToString("yyyy-MM-dd"),
                 TrancheLabel);
 
+            string StatusName = "PurchasedStatus";
             string RDateName = "As Of Date";
             string headerColname = "Deal Name";
 
@@ -183,9 +332,12 @@ namespace MezzDailyDashboard
             DataRow ThisRow;
 
             // Add Report Date and Deal/Tranche Name
+            MasterResultTable.Columns.Add(StatusName, typeof(int));
             MasterResultTable.Columns.Add(RDateName, typeof(DateTime));
             MasterResultTable.Columns.Add(headerColname, typeof(string));
+
             ThisRow = MasterResultTable.NewRow();
+            ThisRow[StatusName] = status;
             ThisRow[RDateName] = AsOfDate.Date;
             ThisRow[headerColname] = DealName + "." + TrancheLabel;
             MasterResultTable.Rows.Add(ThisRow);
@@ -215,6 +367,15 @@ namespace MezzDailyDashboard
                 //QueryList.Clear();
             }
 
+            //// Get CDRs
+            ////Coordinator cordntor = new Coordinator();
+            //Tuple<double, double> CDRs = Coordinator.BreakPIKCDR(DealName + "." + TrancheLabel, DateTime.Today);
+            //MasterResultTable.Columns.Add("PIK CDR", typeof(double));
+            //MasterResultTable.Rows[0]["PIK CDR"] = CDRs.Item1;
+
+            //MasterResultTable.Columns.Add("Breakeven CDR", typeof(double));
+            //MasterResultTable.Rows[0]["Breakeven CDR"] = CDRs.Item2;
+
             // Get Tranche Type
             int trancheType = GetTrancheType(DealName);
             MasterResultTable.Columns.Add("DealType", typeof(int));
@@ -226,33 +387,40 @@ namespace MezzDailyDashboard
 
             // Earliest Call Date
             DateTime EarliestCallDate;
-            EarliestCallDate = (trancheType == 1) ? sfp.GetRefiResetDate(DealName) : DateTime.ParseExact(MasterResultTable.Rows[0]["NCEDATE"].ToString(), "dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).AddDays(90);
+            EarliestCallDate = (trancheType == 1) ? sfp.GetRefiResetDate(DealName) : DateTime.ParseExact(MasterResultTable.Rows[0]["NCEDate"].ToString(), "dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).AddDays(90);
             MasterResultTable.Columns.Add("EarliestCallDate", typeof(DateTime));
             MasterResultTable.Rows[0]["EarliestCallDate"] = EarliestCallDate;
 
             //Calculate ECallDate
-            BondStructure bs = new BondStructure(DealName + "." + TrancheLabel)
+            try
             {
-                rating = (Rating)Enum.Parse(typeof(Rating), MasterResultTable.Rows[0]["MODIFIED_RATING"].ToString()),
-                TrancheType = trancheType,
-                AsOfDate = AsOfDate,
-                EarliestCall = EarliestCallDate,
+                BondStructure bs = new BondStructure(DealName + "." + TrancheLabel)
+                {
+                    rating = (Rating)Enum.Parse(typeof(Rating), MasterResultTable.Rows[0]["MODIFIED_RATING"].ToString()),
+                    TrancheType = trancheType,
+                    AsOfDate = AsOfDate,
+                    EarliestCall = EarliestCallDate,
 
-                Deal_AAA = Convert.ToDouble(MasterResultTable.Rows[0]["DEAL_AAA"].ToString()),
-                JPM_AAA_1 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_AAA1"].ToString()),
-                JPM_AAA_2 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_AAA2"].ToString()),
+                    Deal_AAA = Convert.ToDouble(MasterResultTable.Rows[0]["DEAL_AAA"].ToString()),
+                    JPM_AAA_1 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_AAA1"].ToString()),
+                    JPM_AAA_2 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_AAA2"].ToString()),
 
-                Tranche_Spd = Convert.ToDouble(MasterResultTable.Rows[0]["Coupon"].ToString()),
-                JPM_Sprd1 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_TRANCHE1"].ToString()),
-                JPM_Sprd2 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_TRANCHE2"].ToString()),
+                    Tranche_Spd = Convert.ToDouble(MasterResultTable.Rows[0]["Coupon"].ToString()),
+                    JPM_Sprd1 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_TRANCHE1"].ToString()),
+                    JPM_Sprd2 = Convert.ToDouble(MasterResultTable.Rows[0]["JPM_TRANCHE2"].ToString()),
 
-                WAS = Convert.ToDouble(MasterResultTable.Rows[0]["WAS"].ToString()),
-                WAL = Convert.ToDouble(MasterResultTable.Rows[0]["WAL"].ToString()),
-                NAV = Convert.ToDouble(MasterResultTable.Rows[0]["NAV"].ToString())
-            };
-            CallDateQueue.Enqueue(bs);
+                    WAS = Convert.ToDouble(MasterResultTable.Rows[0]["WAS"].ToString()),
+                    WAL = Convert.ToDouble(MasterResultTable.Rows[0]["WAL"].ToString()),
+                    NAV = Convert.ToDouble(MasterResultTable.Rows[0]["NAV"].ToString())
+                };
+                CallDateQueue.Enqueue(bs);
 
-            DMQueue.Enqueue(MasterResultTable.Rows[0]);
+                DMQueue.Enqueue(MasterResultTable.Rows[0]);
+            }
+            catch (Exception)
+            {
+            }
+            
 
             return MasterResultTable.Rows[0];
         }
@@ -294,6 +462,22 @@ namespace MezzDailyDashboard
 
         }
 
+        private void DTWrite2CSV(DataTable dt,string csvPath, bool APPEND)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            foreach (DataRow row in dt.Rows)
+            {
+                IEnumerable<string> fields = row.ItemArray.Select(field => field.ToString());
+                sb.AppendLine(string.Join(";", fields));
+            }
+
+            using (StreamWriter sw = new StreamWriter(csvPath,append: APPEND))
+            {
+                sw.Write(sb.ToString());
+            }
+        }
+
         private string To_DM_Model_Dataframe(DataRow irow)
         {
             string returnString = string.Format("data.frame(" +
@@ -310,7 +494,7 @@ namespace MezzDailyDashboard
                 Convert.ToDouble(irow["WAS"]),
                 Convert.ToDouble(irow["WAL"]),
                 Convert.ToDouble(irow["NAV"]),
-                Convert.ToDouble(irow["MVOC"])
+                Convert.ToDouble(irow["MVOC"])*100
                 );
             return returnString;
         }

@@ -11,7 +11,8 @@ namespace MezzCashflows
     {
         static void Main(string[] args)
         {
-            
+            //Console.WriteLine(Coordinator.BreakPIKCDR("MRTHN10.D", DateTime.Today));
+            //Console.Read();
         }
     }
 }

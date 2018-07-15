@@ -13,7 +13,26 @@ namespace MezzDailyDashboard
         static void Main(string[] args)
         {
             Tearsheet ts = new Tearsheet();
-            //Console.WriteLine(ConnectDB.ReadDB(1, "select * from clos")[0][0]);
+
+            //string outputAddress = args[0];
+            //int UpdateType = Convert.ToInt16(args[1]);
+
+            //QueryManager qm = new QueryManager(outputAddress);
+
+            //switch (UpdateType)
+            //{
+            //    case 0:
+            //        string[] DealList = args[2].Split(',');
+            //        qm.AddBonds(DateTime.Today, DealList);
+            //        break;
+            //    case 1:
+            //        qm.CurrentPortfolioBehindScene(DateTime.Today);
+            //        break;
+            //    default:
+            //        break;
+            //}
         }
+
+
     }
 }

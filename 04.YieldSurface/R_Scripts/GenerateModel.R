@@ -138,10 +138,10 @@ Yield_MVOC$JPM_DM = JPM_DM$Value[match(Yield_MVOC$JPMDate, JPM_DM$Date)]
     #points(x = Data.Final$T2R, y = predict(D_Tree.DM), col = 'darkorange', pch = 8)
     #points(x = Data.Final$T2R, y = Ens.Model$fitted.values)
 
-    prediction = predict(R_Forest.DM, Data.Final)
-    MAE = mean(abs(Data.Final$DM - prediction))
-    MSE = sqrt(mean((Data.Final$DM - prediction) ^ 2))
-    corr = cor(prediction, Data.Final$DM)
+    #prediction = predict(LinearModel.DM, Data.Final)
+    #MAE = mean(abs(Data.Final$DM - prediction))
+    #MSE = sqrt(mean((Data.Final$DM - prediction) ^ 2))
+    #corr = cor(prediction, Data.Final$DM)
 
     #saveRDS(R_Forest.DM, file = paste0(format(LastDate, "%Y%m%d"), "_", Rating, ".rds"))
     #save(R_Forest.DM, file = 'Z:/32. Structuring/25. Mezzanine Analysis/03.Tools/04.YieldSurface/R_Model/20180713_BB.RData')
